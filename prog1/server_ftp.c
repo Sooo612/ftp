@@ -83,24 +83,22 @@ void excute_com(int sd) {
   uint8_t type, code, *data, *ftp_pay;
   struct ftp_header *recv_header;
 
-  for( ; ; ) {
-    recv(sd, data, sizeof(struct ftp_header), 0);
+  recv(sd, data, sizeof(struct ftp_header), 0);
 
-    recv_header = (struct ftp_header *)data;
-    datalen = ntohs(recv_header->length);
-    type = recv_header->type;
-    code = recv_header->code;
-    ftp_pay = data + sizeof(struct ftp_header);
-    //buf = (char)malloc(sizeof(char) * datalen);
-    //strcpy(buf, ftp_pay);
-    printf("%s\n", ftp_pay);
-    switch(type) {
-      case 0x05 : exe_retv();
-                  break;
-      case 0x06 : exe_str(sd, ftp_pay, datalen);
-                  break;
-      default:    break;
-    }
+  recv_header = (struct ftp_header *)data;
+  datalen = ntohs(recv_header->length);
+  type = recv_header->type;
+  printf("%04x\n", recv_header->type);
+  code = recv_header->code;
+  printf("%04x\n", recv_header->code);
+  ftp_pay = data + sizeof(struct ftp_header);
+  printf("%s\n", ftp_pay);
+  switch(type) {
+    case 0x05 : exe_retv();
+                break;
+    case 0x06 : exe_str(sd, ftp_pay, datalen);
+                break;
+    default:    break;
   }
 }
 
@@ -114,9 +112,8 @@ void exe_str(int sd, uint8_t *ftp_pay, int n) {
   printf("aa\n");
   if((pid = fork()) < 0) {
   } else if(pid == 0){
-  
 
-    //*buf = (char *)ftp_pay;
+   // *buf = (char *)ftp_pay;
     memcpy(buf, ftp_pay, n);
     printf("%s\n", buf);
     if((fp = fopen(buf, "w")) == NULL) {
