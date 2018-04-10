@@ -83,9 +83,11 @@ int main() {
         perror("send");
         exit(1);
       }
-
+                                                                           //ヘッダ受信
       recv(sd, data, sizeof(struct ftp_header), 0);
       recv_header = (struct ftp_header *)data;
+      printf("%04x\n", recv_header->type);
+      printf("%04x\n", recv_header->code);
 
       if(recv_header->type == 0x10) {
         if ((fp = fopen(com[1], "w")) == NULL) {                           //ファイル読み込み 
@@ -96,7 +98,9 @@ int main() {
         n = fread(buf, sizeof(char), 1000, fp);
         if(n < 1000) {
           data = (uint8_t*)malloc(sizeof(struct ftp_header) + sizeof(uint8_t) * n);
+          send_header = (struct ftp_header *)data;
           ftp_pay = data + sizeof(struct ftp_header);
+          fscanf(fp, "%s", buf);
           memcpy(ftp_pay, buf, n);
           send_header->type = 0x20;
           send_header->code = 0x01;
@@ -110,7 +114,6 @@ int main() {
       }
     } else if(strcmp(com[0], "exit") == 0) {
       close(sd);
-      printf("EXIT\n");
       exit(0);
     }
   }
