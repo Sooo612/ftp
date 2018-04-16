@@ -108,12 +108,11 @@ void excute_com(int sd) {
   }
 }
 
-
 void exe_str(int sd, int n) {
   int count, pid;
   FILE *fp;
   char buf[1000];
-  struct ftp_header *send_header, recv_header;
+  struct ftp_header *send_header, *recv_header;
   uint8_t *pay, *send_data;
   //recv pay
   pay = (uint8_t *)malloc(n);
@@ -121,15 +120,15 @@ void exe_str(int sd, int n) {
     perror("recv\n");
     exit(1);
   }
-  //edit file
-  memcpy(buf, (char *)pay, n);
+
+  memcpy(buf, (char *)pay, n);                                              //edit file
   if ((fp = fopen(buf, "w")) == NULL) {
     fprintf(stderr, "%sのオープンに失敗しました.\n", buf);
     exit(EXIT_FAILURE);
   }
   //printf("%s\n", buf);
 
-  send_data = (uint8_t *)malloc(sizeof(struct ftp_header));                //send header
+  send_data = (uint8_t *)malloc(sizeof(struct ftp_header));                 //send header
   send_header = (struct ftp_header *)send_data;
   send_header->type = 0x20;
   send_header->code = 0x02;
@@ -142,29 +141,26 @@ void exe_str(int sd, int n) {
   free(send_data);
   free(pay);
 
-  //recv_header = (struct ftp_header *)malloc(sizeof(struct ftp_header));    //recv header
+  recv_header = (struct ftp_header *)malloc(sizeof(struct ftp_header));    //recv header
 
   for(;;) {
-    printf("a");
-    if((count = recv(sd, &recv_header, sizeof(struct ftp_header), 0)) < 0) {
+    if((count = recv(sd, recv_header, sizeof(struct ftp_header), 0)) < 0) {
       perror("recv\n");
       exit(1);
     }
-    printf("a");
 
-    n = ntohs(recv_header.length);
+    n = ntohs(recv_header->length);
     pay = (uint8_t *)malloc(sizeof(char) * n);
     while(n > 0) {
       if((count = recv(sd, pay, n, 0)) < 0) {                                //recv pay
         perror("recv\n");
         exit(1);
       }
-      printf("a\n");
       fwrite((char *)pay, sizeof(char), count, fp);
       n -= count;
     }
     free(pay);
-    if(recv_header.code == 0x00) {
+    if(recv_header->code == 0x00) {
       break; 
     }
   }
