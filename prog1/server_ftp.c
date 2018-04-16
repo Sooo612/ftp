@@ -24,7 +24,7 @@ struct ftp_header {
 void excute_com(int);
 void getargs(char *, char *);
 void exe_retv();
-void exe_str(int, uint8_t *, int);
+void exe_str(int, int);
 
 int main() {
   int master_s, client_s, count, datalen, pid, n;
@@ -82,67 +82,93 @@ void excute_com(int sd) {
   uint8_t type, code, *data, *ftp_pay;
   struct ftp_header *recv_header;
 
-  recv(sd, data, sizeof(struct ftp_header), 0);
+  for(;;) {
+    recv(sd, data, sizeof(struct ftp_header), 0);
 
-  recv_header = (struct ftp_header *)data;
-  datalen = ntohs(recv_header->length);
-  type = recv_header->type;
-  printf("%04x\n", recv_header->type);
-  code = recv_header->code;
-  printf("%04x\n", recv_header->code);
-  ftp_pay = data + sizeof(struct ftp_header);
-  *buf = (char)ftp_pay;
+    recv_header = (struct ftp_header *)data;
+    datalen = ntohs(recv_header->length);
+    printf("%d\n", datalen);
+    type = recv_header->type;
+    printf("%04x\n", recv_header->type);
+    code = recv_header->code;
+    printf("%04x\n", recv_header->code);
+    //ftp_pay = data + sizeof(struct ftp_header);
 
-  printf("%s\n", buf);
-  fflush(stdout);
-
-  switch(type) {
-    case 0x05 : exe_retv();
-                break;
-    case 0x06 : exe_str(sd, ftp_pay, datalen);
-                break;
-    default:    break; //exit(0);
+    switch(type) {
+      case 0x05: 
+        exe_retv();
+        break;
+      case 0x06:
+        printf("0x06 received!\n");
+        exe_str(sd, datalen);
+        break;
+      default:
+        break; //exit(0);
+    }
   }
 }
 
-void exe_str(int sd, uint8_t *ftp_pay, int n) {
+
+void exe_str(int sd, int n) {
   int count, pid;
   FILE *fp;
-  char *buf;
-  struct ftp_header *send_header, *recv_header;
-  uint8_t *data;
-
-  printf("aa\n");
-  fflush(stdout);
-  *buf = (char)ftp_pay;
-  //memcpy(buf, ftp_pay, n);
-  printf("%s\n", buf);
-
-  if((fp = fopen(buf, "w")) == NULL) {
-    fprintf(stderr, "%sのオープンに失敗しました．\n", buf);
-    exit(EXIT_FAILURE);
-  }
-
-  data = (uint8_t *)malloc(sizeof(struct ftp_header) * sizeof(send_header));
-  send_header = (struct ftp_header *)data; 
-  send_header->type = 0x10;
-  send_header->code = 0x02;
-
-  if((count = send(sd, data, sizeof(struct ftp_header), 0)) < 0) {
-    perror("send");
+  char buf[1000];
+  struct ftp_header *send_header, recv_header;
+  uint8_t *pay, *send_data;
+  //recv pay
+  pay = (uint8_t *)malloc(n);
+  if((count = recv(sd, pay, n, 0)) < 0) {
+    perror("recv\n");
     exit(1);
   }
-
-  recv(sd, data, sizeof(struct ftp_header), 0);
-  recv_header = (struct ftp_header *)data;
-  printf("%04x\n", recv_header->type);
-  printf("%04x\n", recv_header->code);
-
-  ftp_pay = data + sizeof(struct ftp_header);
-  if(recv_header->type == 0x20) {
-    printf("bb\n");
-    fprintf(fp, "%s", ftp_pay);
+  //edit file
+  memcpy(buf, (char *)pay, n);
+  if ((fp = fopen(buf, "w")) == NULL) {
+    fprintf(stderr, "%sのオープンに失敗しました.\n", buf);
+    exit(EXIT_FAILURE);
   }
+  //printf("%s\n", buf);
+
+  send_data = (uint8_t *)malloc(sizeof(struct ftp_header));                //send header
+  send_header = (struct ftp_header *)send_data;
+  send_header->type = 0x20;
+  send_header->code = 0x02;
+  send_header->length = 0;
+
+  if((count = send(sd, send_data, n, 0)) < 0) {
+    perror("recv\n");
+    exit(1);
+  }
+  free(send_data);
+  free(pay);
+
+  //recv_header = (struct ftp_header *)malloc(sizeof(struct ftp_header));    //recv header
+
+  for(;;) {
+    printf("a");
+    if((count = recv(sd, &recv_header, sizeof(struct ftp_header), 0)) < 0) {
+      perror("recv\n");
+      exit(1);
+    }
+    printf("a");
+
+    n = ntohs(recv_header.length);
+    pay = (uint8_t *)malloc(sizeof(char) * n);
+    while(n > 0) {
+      if((count = recv(sd, pay, n, 0)) < 0) {                                //recv pay
+        perror("recv\n");
+        exit(1);
+      }
+      printf("a\n");
+      fwrite((char *)pay, sizeof(char), count, fp);
+      n -= count;
+    }
+    free(pay);
+    if(recv_header.code == 0x00) {
+      break; 
+    }
+  }
+  fclose(fp);
 }
 
 void exe_retv() {

@@ -27,7 +27,7 @@ int main() {
   int sd, count, datalen, n, i, div;
   char *tp, cbuf[512], buf[1000], *com[10], *ip;
   uint8_t *ftp_pay;
-  uint8_t *data;
+  uint8_t *data, *data2;
   struct ftp_header *send_header, *recv_header;
   FILE *fp;
   uint32_t hostlong;
@@ -68,13 +68,13 @@ int main() {
 
     if(strcmp(com[0], "put") == 0) {                         
       strcpy(buf, com[1]);
-      fp = fopen(com[1], "r");
       n = strlen(com[1]) + 1;
+      buf[n - 1] = '\0';
       data = (uint8_t *)malloc(sizeof(struct ftp_header) + sizeof(char) * n);
 
       send_header = (struct ftp_header *)data;
       ftp_pay = data + sizeof(struct ftp_header);
-      memcpy(ftp_pay, buf, n);
+      memcpy((char *)ftp_pay, buf, n);
       send_header->type = 0x06;
       send_header->code = 0x00;
       send_header->length = htons(n);
@@ -83,34 +83,51 @@ int main() {
         perror("send");
         exit(1);
       }
-                                                                           //ヘッダ受信
+
+      printf("aa\n");                                                      //ヘッダ受信
       recv(sd, data, sizeof(struct ftp_header), 0);
       recv_header = (struct ftp_header *)data;
       printf("%04x\n", recv_header->type);
       printf("%04x\n", recv_header->code);
 
-      if(recv_header->type == 0x10) {
-        if ((fp = fopen(com[1], "w")) == NULL) {                           //ファイル読み込み 
+      if(recv_header->type == 0x20) {
+        if ((fp = fopen(com[1], "r")) == NULL) {                           //ファイル読み込み 
           fprintf(stderr, "%sのオープンに失敗しました.\n", com[1]);
           exit(EXIT_FAILURE);
         }
 
-        n = fread(buf, sizeof(char), 1000, fp);
-        if(n < 1000) {
-          data = (uint8_t*)malloc(sizeof(struct ftp_header) + sizeof(uint8_t) * n);
-          send_header = (struct ftp_header *)data;
-          ftp_pay = data + sizeof(struct ftp_header);
-          fscanf(fp, "%s", buf);
-          memcpy(ftp_pay, buf, n);
-          send_header->type = 0x20;
-          send_header->code = 0x01;
-          send_header->length = htons(n);
+        for(;;) {
+          n = fread(buf, sizeof(char), 1000, fp);
 
-          if((count = send(sd, data, sizeof(struct ftp_header) + n, 0)) < 0) {
-            perror("send");
-            exit(1);
+          if(n < 1000) {
+            data2 = (uint8_t*)malloc(sizeof(struct ftp_header) + sizeof(uint8_t) * n);
+            send_header = (struct ftp_header *)data2;
+            ftp_pay = data2 + sizeof(struct ftp_header);
+            memcpy((char *)ftp_pay, buf, n);
+            send_header->type = 0x10;
+            send_header->code = 0x00;
+            send_header->length = htons(n);
+
+            if((count = send(sd, data2, sizeof(struct ftp_header) + n, 0)) < 0) {
+              perror("send");
+              exit(1);
+            }
+            break;
           }
+            data2 = (uint8_t*)malloc(sizeof(struct ftp_header) + sizeof(uint8_t) * n);
+            send_header = (struct ftp_header *)data2;
+            ftp_pay = data2 + sizeof(struct ftp_header);
+            memcpy((char *)ftp_pay, buf, n);
+            send_header->type = 0x10;
+            send_header->code = 0x01;
+            send_header->length = htons(n);
+            
+            if((count = send(sd, data2, sizeof(struct ftp_header) + n, 0)) < 0) {
+              perror("send");
+              exit(1);
+            }
         }
+        fclose(fp);
       }
     } else if(strcmp(com[0], "exit") == 0) {
       close(sd);
